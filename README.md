@@ -124,12 +124,6 @@ Each service will have its own database and use REST APIs for data access.
 
 ### 2. **Gacha Service Endpoints**
 
-Here’s the updated **Gacha Service** with an additional **history** endpoint for retrieving the user's gacha pull history:
-
----
-
-### 2. **Gacha Service Endpoints**
-
 #### 2.1 **Retrieve List of Available Items Endpoint**
 - **Endpoint**: `/gacha/items`
 - **Method**: `GET`
