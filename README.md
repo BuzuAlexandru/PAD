@@ -159,35 +159,43 @@ Each service will have its own database and use REST APIs for data access.
   }
   ```
 
-#### 2.3 **Consume Currency to Get Randomized Hero/Item (Protected)**
-- **Endpoint**: `/gacha/pull`
-- **Method**: `POST`
-- **Description**: Uses currency to perform a gacha pull and returns a random hero or item based on rarity.
-- **Headers**:
-  ```json
-  {
-    "Authorization": "Bearer <JWT_TOKEN>"
-  }
-  ```
-- **Request Data**:
-  ```json
-  {
-    "currencySpent": "integer"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "message": "Pull successful",
-    "item": {
-      "id": "string",
-      "name": "string",
-      "type": "string",  // "hero" or "item"
-      "rarity": "string"  // "rare", "super rare", "ultra rare"
-    },
-    "newCurrencyBalance": "integer"
-  }
-  ```
+#### 2.3 **Consume Currency to Get Randomized Hero/Item (Websocket)**
+- **Endpoint**: `/gacha/banner/{id}`
+- **Description**: Allows users to select a specific banner by its ID and pull a randomized hero or item from that banner. WebSocket allows for real-time interactions with the server.
+
+```json
+{
+  "action": "pull",  // The action being requested
+  "currencySpent": "integer",  // Amount of currency to spend on the pull
+}
+```
+
+#### **Response (Server -> Client)**
+
+After the server processes the gacha pull, the following message is returned:
+
+```json
+{
+  "status": "success",
+  "item": {
+    "id": "string",
+    "name": "string",
+    "type": "string",  // "hero" or "item"
+    "rarity": "string"  // "rare", "super rare", "ultra rare"
+  },
+  "newCurrencyBalance": "integer",  // Updated currency balance after the pull
+  "bannerId": "string",  // The ID of the banner the item was pulled from
+  "pulledAt": "string"  // Timestamp of the pull
+}
+```
+If an error occurs (e.g., insufficient currency), the server can return:
+
+```json
+{
+  "status": "error",
+  "message": "Insufficient currency"
+}
+```
 
 #### 2.4 **Retrieve Gacha Pull History (Protected)**
 - **Endpoint**: `/gacha/history`
@@ -214,6 +222,7 @@ Each service will have its own database and use REST APIs for data access.
           "type": "string",  // "hero" or "item"
           "rarity": "string"  // "rare", "super rare", "ultra rare"
         },
+        "bannerId": "string",  // The ID of the banner the item was pulled from
         "pulledAt": "string",  // Timestamp of the pull event
         "currencySpent": "integer"
       }
