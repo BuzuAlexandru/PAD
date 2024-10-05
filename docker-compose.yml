@@ -1,0 +1,95 @@
+
+services:
+  # Account Service
+  account-service:
+    build:
+      context: ./account_service
+    container_name: account-service
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@account-db:5432/account_service_db
+      - JWT_SECRET_KEY=supersecretkey
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - account-db
+      - redis
+    networks:
+      - backend
+
+  # Gacha Service
+  gacha-service:
+    build:
+      context: ./gacha_service
+    container_name: gacha-service
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@gacha-db:5432/gacha_service_db
+      - ACCOUNT_SERVICE_URL=http://account-service:5000
+    depends_on:
+      - gacha-db
+      - account-service
+    networks:
+      - backend
+
+  # PostgreSQL for Account Service
+  account-db:
+    image: postgres:13
+    container_name: account-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: account_service_db
+    volumes:
+      - account-db-data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  # PostgreSQL for Gacha Service
+  gacha-db:
+    image: postgres:13
+    container_name: gacha-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gacha_service_db
+    volumes:
+      - gacha-db-data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  # Redis for Caching
+  redis:
+    image: redis:6.0-alpine
+    container_name: redis
+    networks:
+      - backend
+    ports:
+      - "6379:6379"
+
+  # Gateway (Express.js)
+  gateway:
+    build:
+      context: ./gateway
+    container_name: gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - ACCOUNT_SERVICE_URL=http://account-service:5000
+      - GACHA_SERVICE_URL=http://gacha-service:5001
+    depends_on:
+      - account-service
+      - gacha-service
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  account-db-data:
+  gacha-db-data:
