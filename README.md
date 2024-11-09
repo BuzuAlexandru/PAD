@@ -18,9 +18,9 @@ Microservices are ideal for complex applications with diverse features that bene
 ## Service Boundaries
 
 - Account service - responsible for authentication and procuring currency.
-- Gacha service - responsible for randomized reward system as well as the socket connection through which a user can choose a specific pool of items which they could get.
+- Gacha service - responsible for randomized reward system.
 
-![](diagram.jpg)
+![](diagram2.jpg)
 
 ## Technology Stack and Communication Patterns
 - API Gateway: ExpressJS, NodeJS
@@ -32,16 +32,50 @@ Microservices are ideal for complex applications with diverse features that bene
 
 The Gateway and Service discovery will communicate via gRPC, the rest will use REST APIs for information exchange.
 
-**Task timeouts** can be implement by setting a maximum execution time for each request using `asyncio` in Python , and enforce **concurrent task limits** by using worker queues to control the number of tasks running simultaneously.
+**Task timeouts** can be implemented by setting a maximum execution time for each request using `asyncio` in Python , and enforce **concurrent task limits** by using worker queues to control the number of tasks running simultaneously.
 
 Load Balancing can be implemented using a simple counter to cycle through a list of server addresses. Each incoming request is directed to the next server in the list
 
 ## Data Management
 Each service will have its own database and use REST APIs for data access.
 
+## Lab 2
+1. **Circuit Breaker with Failover Mechanism**:
+   - Retry a request up to 3 times before switching to another service instance.
+   - Show error only when all services are unavailable.
+2. **Service High Availability**:
+   + Elimination of single points of failure. This means adding or building redundancy into the system so that failure of a component does not mean failure of the entire system.
+   * Reliable crossover. In redundant systems, the crossover point itself tends to become a single point of failure. Reliable systems must provide for reliable crossover.
+   + Detection of failures as they occur. If the two principles above are observed, then a user may never see a failure – but the maintenance activity must.
+3. **ELK Stack or Prometheus + Grafana for Logging** (whichever is easier to set-up):
+   - ELK Stack (Elasticsearch, Logstash, Kibana) or Prometheus + Grafana for aggregating logs and metrics from all services.
+   - Provides centralized logging, real-time metrics, and alerting.
+
+4. **Microservice-based 2-Phase Commit**:
+   - 2-Phase Commit: Ensures atomicity across multiple microservices (databases) by committing changes in two phases.
+   - Long-running saga transactions: As an alternative to 2PC, using a saga pattern with a coordinator to manage long transactions across services.
+
+5. **Consistent Hashing for Cache**:
+   - Distribute cache data across multiple nodes using consistent hashing to reduce cache reorganization.
+   - Done using Redis Clusters.
+
+6. **Database Redundancy/Replication with Failover**:
+   - Using database replication techniques (PostgreSQL master-slave replication) to create multiple replicas.
+   - Automatic failover to secondary database instances in case of primary database failure.
+   - Minimum 3 replicas for redundancy.
+
+7. **Data Warehouse and ETL**:
+   - ETL (Extract, Transform, Load): Implement periodic ETL processes to aggregate data from various services' databases into a Data Warehouse for analytics and reporting.
+
+These technologies and techniques ensure the system is fault-tolerant, scalable, and efficient, with improved monitoring, high availability, and data integrity across microservices.
+## Endpoints
+### 0. **Initialize gacha database endpoint**
+- **Endpoint**: `/initdb`
+- **Method**: `GET`
+- **Description**: Introduces items into the gacha db to be able to perform pulls.
 ### 1. **Account Service Endpoints**
 #### 1.1 **User Registration Endpoint**
-- **Endpoint**: `/account/register`
+- **Endpoint**: `/register`
 - **Method**: `POST`
 - **Description**: Registers a new user.
 - **Request Data**:
@@ -61,7 +95,7 @@ Each service will have its own database and use REST APIs for data access.
   ```
 
 #### 1.2 **User Authentication Endpoint (Login & Token Generation)**
-- **Endpoint**: `/account/login`
+- **Endpoint**: `/login`
 - **Method**: `POST`
 - **Description**: Authenticates the user and returns a JWT token.
 - **Request Data**:
@@ -80,7 +114,7 @@ Each service will have its own database and use REST APIs for data access.
   ```
 
 #### 1.3 **Buy Currency Endpoint (Protected)**
-- **Endpoint**: `/account/buy-currency`
+- **Endpoint**: `/buy-currency`
 - **Method**: `POST`
 - **Description**: Buys in-game currency for the authenticated user.
 - **Headers**:
@@ -105,7 +139,7 @@ Each service will have its own database and use REST APIs for data access.
   ```
 
 #### 1.4 **Retrieve Current Currency Amount Endpoint (Protected)**
-- **Endpoint**: `/account/currency`
+- **Endpoint**: `/currency`
 - **Method**: `GET`
 - **Description**: Retrieves the current amount of currency for the authenticated user.
 - **Headers**:
@@ -125,7 +159,7 @@ Each service will have its own database and use REST APIs for data access.
 ### 2. **Gacha Service Endpoints**
 
 #### 2.1 **Retrieve List of Available Items Endpoint**
-- **Endpoint**: `/gacha/items`
+- **Endpoint**: `/items`
 - **Method**: `GET`
 - **Description**: Retrieves a list of all available heroes or items in the gacha system.
 - **Request Data**: None
@@ -136,7 +170,6 @@ Each service will have its own database and use REST APIs for data access.
       {
         "id": "string",
         "name": "string",
-        "type": "string",  // "hero" or "item"
         "rarity": "string"  // "rare", "super rare", "ultra rare"
       }
     ]
@@ -144,7 +177,7 @@ Each service will have its own database and use REST APIs for data access.
   ```
 
 #### 2.2 **Retrieve Rarity Chances Endpoint**
-- **Endpoint**: `/gacha/rarity-chances`
+- **Endpoint**: `/chances`
 - **Method**: `GET`
 - **Description**: Retrieves the chance of obtaining each rarity.
 - **Request Data**: None
@@ -159,33 +192,23 @@ Each service will have its own database and use REST APIs for data access.
   }
   ```
 
-#### 2.3 **Consume Currency to Get Randomized Hero/Item (Websocket)**
-- **Endpoint**: `/gacha/banner/{id}`
-- **Description**: Allows users to select a specific banner by its ID and pull a randomized hero or item from that banner. WebSocket allows for real-time interactions with the server.
-
+#### 2.3 **Consume Currency to Get Randomized Hero/Item Endpoint (Protected)**
+- **Endpoint**: `/gacha/pull/{id}`
+- **Method**: `GET`
+- **Description**: Allows users to select a specific banner by its ID and pull a randomized hero or item from that banner.
+- **Headers**:
+  ```json
+  {
+    "Authorization": "Bearer <JWT_TOKEN>"
+  }
+  ```
+- **Response**:
 ```json
 {
-  "action": "pull",  // The action being requested
-  "currencySpent": "integer",  // Amount of currency to spend on the pull
-}
-```
-
-#### **Response (Server -> Client)**
-
-After the server processes the gacha pull, the following message is returned:
-
-```json
-{
-  "status": "success",
-  "item": {
-    "id": "string",
-    "name": "string",
-    "type": "string",  // "hero" or "item"
-    "rarity": "string"  // "rare", "super rare", "ultra rare"
-  },
-  "newCurrencyBalance": "integer",  // Updated currency balance after the pull
-  "bannerId": "string",  // The ID of the banner the item was pulled from
-  "pulledAt": "string"  // Timestamp of the pull
+    "pulled_items": [
+        { "item_id": 1, "name": "Sword", "rarity": "Rare" },
+        { "item_id": 2, "name": "Shield", "rarity": "Epic" }
+    ]
 }
 ```
 If an error occurs (e.g., insufficient currency), the server can return:
@@ -197,38 +220,25 @@ If an error occurs (e.g., insufficient currency), the server can return:
 }
 ```
 
-#### 2.4 **Retrieve Gacha Pull History (Protected)**
-- **Endpoint**: `/gacha/history`
-- **Method**: `GET`
-- **Description**: Retrieves the gacha pull history for the authenticated user.
-- **Headers**:
-  ```json
-  {
-    "Authorization": "Bearer <JWT_TOKEN>"
-  }
-  ```
-- **Request Data**: None (User is identified via the JWT)
-  
-- **Response**:
-  ```json
-  {
-    "userId": "string",
-    "pulls": [
-      {
-        "pullId": "string",  // Unique ID for the pull event
-        "item": {
-          "id": "string",
-          "name": "string",
-          "type": "string",  // "hero" or "item"
-          "rarity": "string"  // "rare", "super rare", "ultra rare"
-        },
-        "bannerId": "string",  // The ID of the banner the item was pulled from
-        "pulledAt": "string",  // Timestamp of the pull event
-        "currencySpent": "integer"
-      }
-    ]
-  }
-  ```
+## Deployment 
+#### Requirements
+Git and Docker.
+1. **Clone the Repository**  
+   Start by cloning this repository to your local machine.
+   ```bash
+   git clone https://github.com/BuzuAlexandru/PAD.git
+   cd <repo-dir>
+   ```
 
-## Deployment and Scaling
-Deployment is going to be achieved by creating containers with Docker and using Docker compose for management and scaling.
+2. **Build and Run Containers**  
+   Use Docker Compose to build and start the application services.
+   ```bash
+   docker-compose up --build
+   ```
+3. **Accessing the Application**  
+   Once the containers are up and running, you can access the Postman collection to test the application.
+
+4. **Stopping the Services**  
+   To stop the running containers:
+   ```bash
+   docker-compose down

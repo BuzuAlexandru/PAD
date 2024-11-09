@@ -1,22 +1,71 @@
 
 services:
-  # Account Service
+  consul:
+    image: hashicorp/consul:1.19
+    ports:
+      - "8500:8500" # Web UI
+    networks:
+      - app-network
+    command: "consul agent -dev -client=0.0.0.0"
+# PostgreSQL for Account Service
+  account-db:
+    image: postgres:13
+    container_name: account-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: account_service_db
+    volumes:
+      - account-db-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - app-network
+#    healthcheck:
+#      test: [ "CMD-SHELL", "pg_isready -U user" ]
+#      interval: 10s
+#      retries: 5
+#      start_period: 30s
+
+  # PostgreSQL for Gacha Service
+  gacha-db:
+    image: postgres:13
+    container_name: gacha-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gacha_service_db
+    volumes:
+      - gacha-db-data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - app-network
+#    healthcheck:
+#        test: ["CMD-SHELL", "pg_isready -U user"]
+#        interval: 10s
+#        retries: 5
+#        start_period: 30s
+
   account-service:
-    build:
-      context: ./account_service
+    build: ./account_service
     container_name: account-service
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@account-db:5432/account_service_db
+#      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://user:password@account-db:5432/account_service_db
       - JWT_SECRET_KEY=supersecretkey
+      - SECRET_KEY=your_flask_secret_key
+      - JWT_ALGORITHM= HS256
       - REDIS_URL=redis://redis:6379/0
-    depends_on:
+#    depends_on:
+#      account-db:
+#          condition: service_healthy
+    links:
       - account-db
-      - redis
     networks:
-      - backend
+      - app-network
 
   # Gacha Service
   gacha-service:
@@ -26,47 +75,29 @@ services:
     ports:
       - "5001:5001"
     environment:
-      - FLASK_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@gacha-db:5432/gacha_service_db
-      - ACCOUNT_SERVICE_URL=http://account-service:5000
+#      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://user:password@gacha-db:5432/gacha_service_db
+#      - ACCOUNT_SERVICE_URL=http://account-service:5000
+      - JWT_SECRET_KEY=supersecretkey
+      - SECRET_KEY=your_flask_secret_key
+      - JWT_ALGORITHM= HS256
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
+      redis:
+        condition: service_started
+#      gacha-db:
+#        condition: service_healthy
+    links:
       - gacha-db
-      - account-service
     networks:
-      - backend
-
-  # PostgreSQL for Account Service
-  account-db:
-    image: postgres:13
-    container_name: account-db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: account_service_db
-    volumes:
-      - account-db-data:/var/lib/postgresql/data
-    networks:
-      - backend
-
-  # PostgreSQL for Gacha Service
-  gacha-db:
-    image: postgres:13
-    container_name: gacha-db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: gacha_service_db
-    volumes:
-      - gacha-db-data:/var/lib/postgresql/data
-    networks:
-      - backend
+      - app-network
 
   # Redis for Caching
   redis:
     image: redis:6.0-alpine
     container_name: redis
     networks:
-      - backend
+      - app-network
     ports:
       - "6379:6379"
 
@@ -84,10 +115,10 @@ services:
       - account-service
       - gacha-service
     networks:
-      - backend
+      - app-network
 
 networks:
-  backend:
+  app-network:
     driver: bridge
 
 volumes:

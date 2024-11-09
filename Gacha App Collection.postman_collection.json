@@ -1,0 +1,236 @@
+{
+	"info": {
+		"_postman_id": "b8d04601-6274-49d0-84ce-52131108e712",
+		"name": "Gacha App Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24601277"
+	},
+	"item": [
+		{
+			"name": "Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/status",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\": \"alex2\",\r\n    \"password\":\"123\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/register",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\": \"alex1\",\r\n    \"password\":\"123\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get current currency",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTczMTEwMDQ1NiwianRpIjoiMWQ2YzFlYmItYjhiZS00Mzk1LTgyZjEtOGIyZjQ2ODFhZWNhIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MSwibmJmIjoxNzMxMTAwNDU2LCJjc3JmIjoiMTVhN2E1ZTgtZjcwOC00OGI5LTlhYjQtYzE5MjdkMmMyNjhiIiwiZXhwIjoxNzMxMTAxMzU2fQ.70vIil-5J-0xNh78xYlsK6tPZWH6CVE7zoJddS2mfPw",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/currency",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"currency"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Top up currency",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTczMTEwMDQ1NiwianRpIjoiMWQ2YzFlYmItYjhiZS00Mzk1LTgyZjEtOGIyZjQ2ODFhZWNhIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MSwibmJmIjoxNzMxMTAwNDU2LCJjc3JmIjoiMTVhN2E1ZTgtZjcwOC00OGI5LTlhYjQtYzE5MjdkMmMyNjhiIiwiZXhwIjoxNzMxMTAxMzU2fQ.70vIil-5J-0xNh78xYlsK6tPZWH6CVE7zoJddS2mfPw",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"amount\":10000\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/buy-currency",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"buy-currency"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Obtainable Items",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/items",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"items"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Pull Rates",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:3000/chances",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "3000",
+					"path": [
+						"chances"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Do 10 pull",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTczMTEwMDQ1NiwianRpIjoiMWQ2YzFlYmItYjhiZS00Mzk1LTgyZjEtOGIyZjQ2ODFhZWNhIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MSwibmJmIjoxNzMxMTAwNDU2LCJjc3JmIjoiMTVhN2E1ZTgtZjcwOC00OGI5LTlhYjQtYzE5MjdkMmMyNjhiIiwiZXhwIjoxNzMxMTAxMzU2fQ.70vIil-5J-0xNh78xYlsK6tPZWH6CVE7zoJddS2mfPw",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/gacha/pull/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"gacha",
+						"pull",
+						"1"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -2,7 +2,7 @@ import redis
 import json
 
 # Connect to Redis
-cache = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
+cache = redis.StrictRedis(host='redis', port=6379, decode_responses=True)
 
 
 def cache_data(key, data, expiration=60):

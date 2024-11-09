@@ -2,6 +2,7 @@ Flask==3.0.3
 Werkzeug==3.0.4
 Flask-JWT-Extended==4.6.0
 SQLAlchemy==2.0.35
+python-dotenv==1.0.1
 Flask-SQLAlchemy==3.1.1
 psycopg2-binary==2.9.3
 redis==4.3.1

@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from models import db, User
+from dotenv import load_dotenv
 from redis_cache import cache_data, get_cached_data, delete_cache
 from sqlalchemy.exc import SQLAlchemyError
 from flask_sqlalchemy import SQLAlchemy
@@ -8,6 +9,7 @@ import redis
 import json
 
 app = Flask(__name__)
+load_dotenv()
 app.config.from_object('config.Config')
 
 # Setup JWT

@@ -1,86 +1,88 @@
+import os
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from models import Item, GachaHistory, Banner
 from database import init_db, db
 from redis_cache import cache, get_cached_data, cache_data
 import random
-from flask_socketio import SocketIO, emit, send
 from flask_jwt_extended import jwt_required
+from dotenv import load_dotenv
 from models import Item, GachaHistory
 import requests
 
 app = Flask(__name__)
-
+load_dotenv()
 # JWT setup
-app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key'
+app.config['JWT_SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
 jwt = JWTManager(app)
 init_db(app)
 with app.app_context():
     db.create_all()
 
 
-# db.init_app(app)
+@app.route('/initdb')
+def init_db():
+    from models import Banner, Item
 
+    hero_banner = Banner(name='Hero Banner')
+    equipment_banner = Banner(name='Equipment Banner')
 
+    # Add banners to the session
+    db.session.add_all([hero_banner, equipment_banner])
+    db.session.commit()
+
+    hero_items = [
+        # Rare
+        Item(name='Common Knight', rarity='rare', banner_id=hero_banner.id),
+        Item(name='Foot Soldier', rarity='rare', banner_id=hero_banner.id),
+        Item(name='Rookie Archer', rarity='rare', banner_id=hero_banner.id),
+        Item(name='Apprentice Mage', rarity='rare', banner_id=hero_banner.id),
+        Item(name='Novice Healer', rarity='rare', banner_id=hero_banner.id),
+
+        # Super Rare
+        Item(name='Elite Knight', rarity='super rare', banner_id=hero_banner.id),
+        Item(name='Veteran Archer', rarity='super rare', banner_id=hero_banner.id),
+        Item(name='Master Mage', rarity='super rare', banner_id=hero_banner.id),
+        Item(name='Battle Healer', rarity='super rare', banner_id=hero_banner.id),
+        Item(name='Champion Swordsman', rarity='super rare', banner_id=hero_banner.id),
+
+        # Ultra Rare
+        Item(name='Dragon Slayer', rarity='ultra rare', banner_id=hero_banner.id),
+        Item(name='Archmage', rarity='ultra rare', banner_id=hero_banner.id),
+        Item(name='Shadow Assassin', rarity='ultra rare', banner_id=hero_banner.id),
+        Item(name='Divine Healer', rarity='ultra rare', banner_id=hero_banner.id),
+        Item(name='Paladin of Light', rarity='ultra rare', banner_id=hero_banner.id)
+    ]
+
+    # Equipment Banner Items
+    equipment_items = [
+        # Rare
+        Item(name='Iron Sword', rarity='rare', banner_id=equipment_banner.id),
+        Item(name='Leather Armor', rarity='rare', banner_id=equipment_banner.id),
+        Item(name='Wooden Shield', rarity='rare', banner_id=equipment_banner.id),
+        Item(name='Simple Helm', rarity='rare', banner_id=equipment_banner.id),
+        Item(name='Training Boots', rarity='rare', banner_id=equipment_banner.id),
+
+        # Super Rare
+        Item(name='Silver Sword', rarity='super rare', banner_id=equipment_banner.id),
+        Item(name='Steel Armor', rarity='super rare', banner_id=equipment_banner.id),
+        Item(name='Reinforced Shield', rarity='super rare', banner_id=equipment_banner.id),
+        Item(name='Battle Helm', rarity='super rare', banner_id=equipment_banner.id),
+        Item(name='War Boots', rarity='super rare', banner_id=equipment_banner.id),
+
+        # Ultra Rare
+        Item(name='Excalibur', rarity='ultra rare', banner_id=equipment_banner.id),
+        Item(name='Dragon Scale Armor', rarity='ultra rare', banner_id=equipment_banner.id),
+        Item(name='Aegis Shield', rarity='ultra rare', banner_id=equipment_banner.id),
+        Item(name='Crown of Kings', rarity='ultra rare', banner_id=equipment_banner.id),
+        Item(name='Boots of Speed', rarity='ultra rare', banner_id=equipment_banner.id)
+    ]
+
+    db.session.add_all(hero_items + equipment_items)
+    db.session.commit()
+    return 200
 @app.route('/status')
 def status():
-    from models import Banner, Item
-    # hero_banner = Banner(name='Hero Banner')
-    # equipment_banner = Banner(name='Equipment Banner')
-    #
-    # # Add banners to the session
-    # db.session.add_all([hero_banner, equipment_banner])
-    # db.session.commit()
-    #
-    # hero_items = [
-    #     # Rare
-    #     Item(name='Common Knight', rarity='rare', banner_id=hero_banner.id),
-    #     Item(name='Foot Soldier', rarity='rare', banner_id=hero_banner.id),
-    #     Item(name='Rookie Archer', rarity='rare', banner_id=hero_banner.id),
-    #     Item(name='Apprentice Mage', rarity='rare', banner_id=hero_banner.id),
-    #     Item(name='Novice Healer', rarity='rare', banner_id=hero_banner.id),
-    #
-    #     # Super Rare
-    #     Item(name='Elite Knight', rarity='super rare', banner_id=hero_banner.id),
-    #     Item(name='Veteran Archer', rarity='super rare', banner_id=hero_banner.id),
-    #     Item(name='Master Mage', rarity='super rare', banner_id=hero_banner.id),
-    #     Item(name='Battle Healer', rarity='super rare', banner_id=hero_banner.id),
-    #     Item(name='Champion Swordsman', rarity='super rare', banner_id=hero_banner.id),
-    #
-    #     # Ultra Rare
-    #     Item(name='Dragon Slayer', rarity='ultra rare', banner_id=hero_banner.id),
-    #     Item(name='Archmage', rarity='ultra rare', banner_id=hero_banner.id),
-    #     Item(name='Shadow Assassin', rarity='ultra rare', banner_id=hero_banner.id),
-    #     Item(name='Divine Healer', rarity='ultra rare', banner_id=hero_banner.id),
-    #     Item(name='Paladin of Light', rarity='ultra rare', banner_id=hero_banner.id)
-    # ]
-    #
-    # # Equipment Banner Items
-    # equipment_items = [
-    #     # Rare
-    #     Item(name='Iron Sword', rarity='rare', banner_id=equipment_banner.id),
-    #     Item(name='Leather Armor', rarity='rare', banner_id=equipment_banner.id),
-    #     Item(name='Wooden Shield', rarity='rare', banner_id=equipment_banner.id),
-    #     Item(name='Simple Helm', rarity='rare', banner_id=equipment_banner.id),
-    #     Item(name='Training Boots', rarity='rare', banner_id=equipment_banner.id),
-    #
-    #     # Super Rare
-    #     Item(name='Silver Sword', rarity='super rare', banner_id=equipment_banner.id),
-    #     Item(name='Steel Armor', rarity='super rare', banner_id=equipment_banner.id),
-    #     Item(name='Reinforced Shield', rarity='super rare', banner_id=equipment_banner.id),
-    #     Item(name='Battle Helm', rarity='super rare', banner_id=equipment_banner.id),
-    #     Item(name='War Boots', rarity='super rare', banner_id=equipment_banner.id),
-    #
-    #     # Ultra Rare
-    #     Item(name='Excalibur', rarity='ultra rare', banner_id=equipment_banner.id),
-    #     Item(name='Dragon Scale Armor', rarity='ultra rare', banner_id=equipment_banner.id),
-    #     Item(name='Aegis Shield', rarity='ultra rare', banner_id=equipment_banner.id),
-    #     Item(name='Crown of Kings', rarity='ultra rare', banner_id=equipment_banner.id),
-    #     Item(name='Boots of Speed', rarity='ultra rare', banner_id=equipment_banner.id)
-    # ]
-    #
-    # db.session.add_all(hero_items + equipment_items)
-    # db.session.commit()
     return jsonify({"status": "Gacha Service is running"}), 200
 
 
@@ -90,7 +92,7 @@ def get_items():
     """Retrieve available items and their rarities with caching."""
     cached_items = get_cached_data("cached-items")
     if cached_items:
-        return jsonify({"cache": cached_items}), 200
+        return jsonify(cached_items), 200
 
     items = Item.query.all()
     result = [{"name": item.name, "rarity": item.rarity} for item in items]
@@ -114,9 +116,6 @@ def get_rarity_chances():
     return jsonify(RARITY_CHANCES), 200
 
 
-socketio = SocketIO(app)
-
-
 @app.route('/gacha/banner/<int:banner_id>', methods=['GET'])
 @jwt_required()
 def banner_info(banner_id):
@@ -125,7 +124,7 @@ def banner_info(banner_id):
     return jsonify([{"id": item.id, "name": item.name, "rarity": item.rarity} for item in items])
 
 
-ACCOUNT_SERVICE_URL = "http://localhost:5000"
+ACCOUNT_SERVICE_URL = "http://host.docker.internal:5000"
 
 
 # Function to check the user's current currency
@@ -150,30 +149,29 @@ def deduct_currency(user_id, amount, token):
     return response.json()
 
 
-@socketio.on('pull', namespace='/gacha')
+@app.route('/gacha/pull/<int:banner_id>', methods=['GET'])
 @jwt_required()
-def handle_pull_items(data):
-    user_id = data.get('user_id')
-    banner_id = data.get('banner_id')
+def handle_pull_items(banner_id):
+    user_id = get_jwt_identity()
 
     # Check if the banner exists
     banner = Banner.query.get(banner_id)
     if not banner:
-        send({'error': 'Invalid banner selected'})
-        return
+        return jsonify({'error': 'Invalid banner selected'}), 400
+
+    jwt_token = request.headers.get('Authorization')
 
     # Fetch the user currency
-    response = requests.get(f"{ACCOUNT_SERVICE_URL}/currency", headers={'Authorization': data['token']})
+    response = requests.get(f"{ACCOUNT_SERVICE_URL}/currency", headers={'Authorization': jwt_token})
     currency = response.json().get('currency')
 
     # Check if the user has enough currency (1000 currency per pull)
     if currency < 1000:
-        send({'error': 'Insufficient currency'})
-        return
+        return jsonify({'error': 'Insufficient currency'}), 400
 
     # Deduce 1000 currency from the account
     requests.put(f"{ACCOUNT_SERVICE_URL}/deduce-currency", json={'amount': 1000},
-                 headers={'Authorization': data['token']})
+                 headers={'Authorization': jwt_token})
 
     # Get items grouped by rarity
     items_by_rarity = {
@@ -187,7 +185,11 @@ def handle_pull_items(data):
     for _ in range(10):
         rarity = random.choices(list(RARITY_CHANCES.keys()), weights=RARITY_CHANCES.values(), k=1)[0]
         selected_item = random.choice(items_by_rarity[rarity])
-        pulled_items.append(selected_item.name)
+        pulled_items.append({
+        'item_id': selected_item.id,  # Assuming `selected_item` has an `id` attribute
+        'name': selected_item.name,
+        'rarity': rarity
+    })
 
     # Record the pull in the gacha history
     gacha_history = GachaHistory(
@@ -199,11 +201,11 @@ def handle_pull_items(data):
     db.session.commit()
 
     # Send back the pulled items
-    send({
+    return jsonify({
         'message': 'Gacha pull successful',
         'items': pulled_items
-    })
+    }), 200
 
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

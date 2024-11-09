@@ -3,8 +3,7 @@ const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 const timeout = require('connect-timeout');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const WebSocket = require('ws');
-
+const CircuitBreaker = require('opossum');
 const { ACCOUNT_SERVICE_URL, GACHA_SERVICE_URL } = require('./config');
 
 const app = express();
@@ -12,13 +11,21 @@ app.use(express.json());
 
  // app.use(timeout('30s'));
 
-const wsProxy = createProxyMiddleware('/gacha/banner', {
-    target: GACHA_SERVICE_URL,
-    changeOrigin: true,
-    ws: true,
-});
+const options = {
+    timeout: 3000, // If a request takes longer than 3 seconds, it fails
+    errorThresholdPercentage: 50, // Open circuit if 50% of requests fail
+    resetTimeout: 10000, // Try again after 10 seconds
+};
 
-// app.use('/gacha/banner', wsProxy);
+const accountCircuit = new CircuitBreaker(async (endpoint, data, headers) => {
+    const response = await axios.post(endpoint, data, { headers });
+    return response.data;
+}, options);
+
+const gachaCircuit = new CircuitBreaker(async (endpoint) => {
+    const response = await axios.get(endpoint);
+    return response.data;
+}, options);
 
 // Concurrent request limiter (limits to 10 requests per minute per user)
 const limiter = rateLimit({
@@ -71,7 +78,7 @@ app.post('/login', haltOnTimedOut, async (req, res) => {
 
 app.get('/currency', haltOnTimedOut, async (req, res) => {
     try {
-        const response = await axios.get(`${ACCOUNT_SERVICE_URL}/currency`, { timeout: 3000 }, {
+        const response = await axios.get(`${ACCOUNT_SERVICE_URL}/currency`, {
             headers: { Authorization: req.headers.authorization },
         });
         res.status(response.status).json(response.data);
@@ -82,9 +89,9 @@ app.get('/currency', haltOnTimedOut, async (req, res) => {
 
 app.post('/buy-currency', haltOnTimedOut, async (req, res) => {
     try {
-        const response = await axios.post(`${ACCOUNT_SERVICE_URL}/buy-currency`, req.body, { timeout: 3000 }, {
+        const response = await axios.post(`${ACCOUNT_SERVICE_URL}/buy-currency`, req.body, {
             headers: { Authorization: req.headers.authorization },
-        });
+        }, { timeout: 3000 });
         res.status(response.status).json(response.data);
     } catch (error) {
         handleServiceError(res, error);
@@ -110,62 +117,17 @@ app.get('/chances', haltOnTimedOut, async (req, res) => {
     }
 });
 
-const server = app.listen(3000, () => {
-    console.log('Gateway running on port 3000');
+app.get('/gacha/pull/:banner_id', haltOnTimedOut, async (req, res) => {
+    try {
+        const response = await axios.get(`${GACHA_SERVICE_URL}/gacha/pull/${req.params.banner_id}`, {
+            headers: { Authorization: req.headers.authorization },
+            timeout: 3000,
+        });
+        res.status(response.status).json(response.data);
+    } catch (error) {
+        handleServiceError(res, error);
+    }
 });
-
-// Setup WebSocket server (proxy WebSocket traffic to Gacha Service)
-const wss = new WebSocket.Server({ server });
-const GACHA_SOCKET_URL = 'ws://localhost:5001/gacha';  // URL of your gacha service WebSocket
-
-// Handle WebSocket connections
-wss.on('connection', function connection(ws, req) {
-    console.log('Client connected to gateway WebSocket');
-
-    // Listen for messages from the client
-    ws.on('message', async function incoming(message) {
-        console.log('Received message from client:', message);
-
-        const data = JSON.parse(message);
-
-        // Forward request to the Gacha service WebSocket
-        const gachaWs = new WebSocket(`${GACHA_SOCKET_URL}/banner/${data.banner_id}`);
-
-        // When Gacha service connection is open
-        gachaWs.on('open', function open() {
-            // Forward the user data to the Gacha service
-            gachaWs.send(JSON.stringify({
-                user_id: data.user_id,
-                token: data.token
-            }));
-        });
-
-        // Listen for messages from Gacha service and forward it to the client
-        gachaWs.on('message', function incoming(gachaMessage) {
-            console.log('Received message from Gacha service:', gachaMessage);
-
-            // Forward the message from Gacha service back to the client
-            ws.send(gachaMessage);
-        });
-
-        // Handle errors in Gacha service WebSocket
-        gachaWs.on('error', function error(err) {
-            console.error('Error in Gacha service WebSocket:', err);
-            ws.send(JSON.stringify({ error: 'Gacha service error' }));
-        });
-    });
-
-    // Handle WebSocket close events
-    ws.on('close', function close() {
-        console.log('Client disconnected from gateway WebSocket');
-    });
-
-    // Handle WebSocket errors
-    ws.on('error', function error(err) {
-        console.error('Error in client WebSocket:', err);
-    });
-});
-
 // Error handling for service calls
 function handleServiceError(res, error) {
 
@@ -178,7 +140,7 @@ function handleServiceError(res, error) {
     }
 }
 
-// // Start server
-// app.listen(3000, () => {
-//     console.log('Gateway is running on port 3000');
-// });
+ // Start server
+ app.listen(3000, () => {
+     console.log('Gateway is running on port 3000');
+ });
