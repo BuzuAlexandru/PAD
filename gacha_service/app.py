@@ -7,7 +7,8 @@ from redis_cache import cache, get_cached_data, cache_data
 import random
 from flask_jwt_extended import jwt_required
 from dotenv import load_dotenv
-from models import Item, GachaHistory
+from sqlalchemy import create_engine, MetaData, Table
+from sqlalchemy.orm import sessionmaker
 import requests
 
 app = Flask(__name__)
@@ -22,8 +23,6 @@ with app.app_context():
 
 @app.route('/initdb')
 def init_db():
-    from models import Banner, Item
-
     hero_banner = Banner(name='Hero Banner')
     equipment_banner = Banner(name='Equipment Banner')
 
@@ -148,6 +147,15 @@ def deduct_currency(user_id, amount, token):
         raise Exception("Currency deduction failed")
     return response.json()
 
+account_engine = create_engine(os.environ["ACCOUNT_DATABASE_URL"])
+gacha_engine = create_engine(os.environ["DATABASE_URL"])
+
+metadata = MetaData()
+user_table = Table('user', metadata, autoload_with=account_engine)
+
+AccountSession = sessionmaker(bind=account_engine)
+GachaSession = sessionmaker(bind=gacha_engine)
+
 
 @app.route('/gacha/pull/<int:banner_id>', methods=['GET'])
 @jwt_required()
@@ -155,57 +163,79 @@ def handle_pull_items(banner_id):
     user_id = get_jwt_identity()
 
     # Check if the banner exists
-    banner = Banner.query.get(banner_id)
+    gacha_session = GachaSession()
+    banner = gacha_session.get(Banner, banner_id)
     if not banner:
+        gacha_session.close()
         return jsonify({'error': 'Invalid banner selected'}), 400
 
-    jwt_token = request.headers.get('Authorization')
+    # Initialize sessions for each database
+    account_session = AccountSession()
 
-    # Fetch the user currency
-    response = requests.get(f"{ACCOUNT_SERVICE_URL}/currency", headers={'Authorization': jwt_token})
-    currency = response.json().get('currency')
+    try:
+        # Step 1: Fetch the user's currency
+        user = account_session.execute(
+            user_table.select().where(user_table.c.id == user_id)
+        ).fetchone()
+        # Step 2: Check currency amount
+        if not user or user.currency < 1000:
+            return jsonify({'error': 'Insufficient currency'}), 400
 
-    # Check if the user has enough currency (1000 currency per pull)
-    if currency < 1000:
-        return jsonify({'error': 'Insufficient currency'}), 400
+        # Begin two-phase transaction
+        account_session.begin_nested()  # Phase 1: Prepare transaction
+        gacha_session.begin_nested()
 
-    # Deduce 1000 currency from the account
-    requests.put(f"{ACCOUNT_SERVICE_URL}/deduce-currency", json={'amount': 1000},
-                 headers={'Authorization': jwt_token})
+        # Deduct currency in `account_db`
+        account_session.execute(
+            user_table.update()
+            .where(user_table.c.id == user_id)
+            .values(currency=user.currency - 1000)
+        )
+        # Pull items and save history in `gacha_db`
+        items_by_rarity = {
+            'rare': [item for item in banner.items if item.rarity == 'rare'],
+            'super rare': [item for item in banner.items if item.rarity == 'super rare'],
+            'ultra rare': [item for item in banner.items if item.rarity == 'ultra rare']
+        }
 
-    # Get items grouped by rarity
-    items_by_rarity = {
-        'rare': [item for item in banner.items if item.rarity == 'rare'],
-        'super rare': [item for item in banner.items if item.rarity == 'super rare'],
-        'ultra rare': [item for item in banner.items if item.rarity == 'ultra rare']
-    }
+        pulled_items = []
+        for _ in range(10):
+            rarity = random.choices(list(RARITY_CHANCES.keys()), weights=RARITY_CHANCES.values(), k=1)[0]
+            selected_item = random.choice(items_by_rarity[rarity])
+            pulled_items.append({
+                'item_id': selected_item.id,
+                'name': selected_item.name,
+                'rarity': rarity
+            })
 
-    # Pull 10 items based on rarity distribution
-    pulled_items = []
-    for _ in range(10):
-        rarity = random.choices(list(RARITY_CHANCES.keys()), weights=RARITY_CHANCES.values(), k=1)[0]
-        selected_item = random.choice(items_by_rarity[rarity])
-        pulled_items.append({
-        'item_id': selected_item.id,  # Assuming `selected_item` has an `id` attribute
-        'name': selected_item.name,
-        'rarity': rarity
-    })
+        # Record the pull in gacha history
+        gacha_history = GachaHistory(
+            user_id=user_id,
+            banner_id=banner_id,
+            pulled_items=pulled_items
+        )
+        gacha_session.add(gacha_history)
 
-    # Record the pull in the gacha history
-    gacha_history = GachaHistory(
-        user_id=user_id,
-        banner_id=banner_id,
-        pulled_items=pulled_items
-    )
-    db.session.add(gacha_history)
-    db.session.commit()
+        account_session.commit()
+        gacha_session.commit()
 
-    # Send back the pulled items
-    return jsonify({
-        'message': 'Gacha pull successful',
-        'items': pulled_items
-    }), 200
+        account_session.commit()
+        gacha_session.commit()
 
+        return jsonify({
+            'message': 'Gacha pull successful',
+            'items': pulled_items
+        }), 200
+
+    except Exception as e:
+        account_session.rollback()  # Roll back both sessions if any step fails
+        gacha_session.rollback()
+        return jsonify({'error': 'Transaction failed', 'details': str(e)}), 500
+
+    finally:
+        # Close the sessions
+        account_session.close()
+        gacha_session.close()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

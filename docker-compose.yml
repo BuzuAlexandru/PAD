@@ -2,6 +2,8 @@
 services:
   consul:
     image: hashicorp/consul:1.19
+    volumes:
+      - ./server.json:/consul/config/server.json:ro
     ports:
       - "8500:8500" # Web UI
     networks:
@@ -21,11 +23,6 @@ services:
       - "5434:5432"
     networks:
       - app-network
-#    healthcheck:
-#      test: [ "CMD-SHELL", "pg_isready -U user" ]
-#      interval: 10s
-#      retries: 5
-#      start_period: 30s
 
   # PostgreSQL for Gacha Service
   gacha-db:
@@ -41,11 +38,6 @@ services:
       - "5435:5432"
     networks:
       - app-network
-#    healthcheck:
-#        test: ["CMD-SHELL", "pg_isready -U user"]
-#        interval: 10s
-#        retries: 5
-#        start_period: 30s
 
   account-service:
     build: ./account_service
@@ -59,9 +51,12 @@ services:
       - SECRET_KEY=your_flask_secret_key
       - JWT_ALGORITHM= HS256
       - REDIS_URL=redis://redis:6379/0
-#    depends_on:
-#      account-db:
-#          condition: service_healthy
+      - CONSUL_HTTP_ADDR=http://consul:8500
+    depends_on:
+      account-db:
+          condition: service_started
+      consul:
+        condition: service_started
     links:
       - account-db
     networks:
@@ -71,24 +66,31 @@ services:
   gacha-service:
     build:
       context: ./gacha_service
-    container_name: gacha-service
-    ports:
-      - "5001:5001"
+    deploy:
+      mode: replicated
+      replicas: 3
+      endpoint_mode: dnsrr
     environment:
-#      - FLASK_ENV=development
+      - SERVICE_PORT=5001
       - DATABASE_URL=postgresql://user:password@gacha-db:5432/gacha_service_db
-#      - ACCOUNT_SERVICE_URL=http://account-service:5000
+      - ACCOUNT_DATABASE_URL=postgresql://user:password@account-db:5432/account_service_db
       - JWT_SECRET_KEY=supersecretkey
       - SECRET_KEY=your_flask_secret_key
       - JWT_ALGORITHM= HS256
       - REDIS_URL=redis://redis:6379/0
+      - CONSUL_HTTP_ADDR=http://consul:8500
     depends_on:
       redis:
         condition: service_started
-#      gacha-db:
-#        condition: service_healthy
+      gacha-db:
+        condition: service_started
+      account-db:
+        condition: service_started
+      consul:
+        condition: service_started
     links:
       - gacha-db
+      - account-db
     networks:
       - app-network
 
@@ -111,9 +113,11 @@ services:
     environment:
       - ACCOUNT_SERVICE_URL=http://account-service:5000
       - GACHA_SERVICE_URL=http://gacha-service:5001
+      - CONSUL_HOST=consul
     depends_on:
       - account-service
       - gacha-service
+      - consul
     networks:
       - app-network
 

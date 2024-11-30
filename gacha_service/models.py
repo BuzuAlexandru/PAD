@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from database import db
-from sqlalchemy import Column, Integer, String, Float, Enum, ForeignKey, DateTime, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Float, Enum, ForeignKey, DateTime, JSON, create_engine
+from sqlalchemy.orm import relationship, sessionmaker
 import enum
 
 
@@ -21,7 +21,6 @@ class Item(db.Model):
     banner_id = Column(Integer, ForeignKey('banners.id'), nullable=False)
 
     banner = relationship('Banner', back_populates='items')
-
 
 class Banner(db.Model):
     __tablename__ = 'banners'
